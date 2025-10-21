@@ -15,8 +15,11 @@ return new class extends Migration
             $table->uuid('id')->primray();
             $table->uuid('id_user');
             $table->uuid('id_dokumen');
-            $table->text('aktivitas');
+            $table->string('aktivitas');
+            $table->string('modul')->nullable(); //dokumen, arsip dll masih gajelas
+            $table->text('keterangan')->nullable();
             $table->timestamp('waktu_aktivitas')->useCurrent();
+            $table->timestamps();
 
             $table->foreign('id_user')->references('id')->on('users')->onDelete('cascade');
             $table->foreign('id_dokumen')->references('id')->on('documents')->onDelete('cascade');

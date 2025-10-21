@@ -13,12 +13,18 @@ class RoleMiddleware
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, ...$roles): Response
     {
         $user = $request->user();
 
-        if (!$user || !in_array($user->role, ['kepdes', 'sekdes'])) {
-            return response()->json(['Unathorized'], 403);
+        // kalau belum login
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        // kalau rolenya tidak termasuk di daftar yang diizinkan
+        if (!in_array($user->role, $roles)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         return $next($request);

@@ -15,10 +15,11 @@ class Archive extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'id_ref',
-        'tahun',
-        'kategori',
-        'metadata',
+        'id_dokumen',
+        'user_id',
+        'nomor_arsip',
+        'tanggal_arsip',
+        'keterangan',
     ];
 
     protected static function boot(){

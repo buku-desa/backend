@@ -9,20 +9,22 @@ use Illuminate\Support\Str;
 class Document extends Model
 {
     use HasFactory;
-    protected $primaryKey = 'id_dokumen';
+    protected $primaryKey = 'id';
     public $incrementing = false;
     protected $keyType = 'string';
 
     protected $fillable = [
+        'type',
         'jenis_dokumen',
         'nomor_dokumen',
         'tanggal_ditetapkan',
         'tentang',
+        'uraian_singkat',
+        'tanggal_dilaporkan',
         'tanggal_diundangkan',
         'nomor_diundangkan',
         'keterangan',
         'file_upload',
-        'ocr_metadata',
         'status',
         'id_user',
     ];

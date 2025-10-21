@@ -13,13 +13,15 @@ return new class extends Migration
     {
         Schema::create('archives', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->integer('tahun');
-            $table->string('kategori');
-            $table->uuid('id_ref');
-            $table->text('metadata')->nullable();
+            $table->uuid('id_dokumen');
+            $table->uuid('user_id');
+            $table->string('nomor_arsip')->nullable();
+            $table->date('tanggal_arsip')->nullable();
+            $table->text('keterangan')->nullable();
             $table->timestamps();
 
-            $table->foreign('id_ref')->references('id')->on('documents')->onDelete('cascade');
+            $table->foreign('id_dokumen')->references('id')->on('documents')->onDelete('cascade');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });
     }
 

@@ -18,6 +18,8 @@ class ActivityLog extends Model
         'id_user',
         'id_dokumen',
         'aktivitas',
+        'modul',
+        'keterangan',
         'waktu_aktivitas',
     ];
 
