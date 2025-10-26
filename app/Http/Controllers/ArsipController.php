@@ -7,9 +7,12 @@ use App\Models\Archive;
 use App\Models\Document;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use App\Traits\LogsActivity;
 
 class ArsipController extends Controller
 {
+    use LogsActivity;
+
     // GET /api/archives  (sekdes|kepdes)
     public function index(Request $request)
     {
@@ -31,30 +34,23 @@ class ArsipController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            // 'user_id'       => ['required', 'uuid', 'exists:users,id'],
-            'id_dokumen'    => ['required','uuid','exists:documents,id'],
-            'nomor_arsip'   => ['nullable','string','max:150'],
-            'tanggal_arsip' => ['required','date'],
-            'keterangan'    => ['nullable','string'],
+            'id_dokumen'    => ['required', 'uuid', 'exists:documents,id'],
+            'tanggal_arsip' => ['nullable', 'date'],
+            'keterangan'    => ['nullable', 'string'],
         ]);
 
         $doc = Document::findOrFail($validated['id_dokumen']);
 
-        if ($doc->status !== 'Disetujui') {
-            Log::info('Cek status gagal: '.$doc->status);
-            return response()->json(['message' => 'Hanya dokumen Disetujui yang bisa diarsipkan.'], 422);
-        }   
+        try {
+            $arsip = $doc->arsipkan(
+                $request->user()->id,
+                $validated['tanggal_arsip'] ?? null,
+                $validated['keterangan'] ?? null
+            );
 
-        $arsip = Archive::create([
-            'id_dokumen'    => $doc->id,
-            'user_id'       => $request->user()->id,
-            'nomor_arsip'   => $validated['nomor_arsip'] ?? null,
-            'tanggal_arsip' => $validated['tanggal_arsip'],
-            'keterangan'    => $validated['keterangan'] ?? null,
-        ]);
-
-        $doc->update(['status' => 'Arsip']);
-
-        return (new ArchiveResource($arsip->load('document')))->response()->setStatusCode(201);
+            return (new ArchiveResource($arsip->load('document')))->response()->setStatusCode(201);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 }

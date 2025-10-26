@@ -21,7 +21,7 @@ class ActivityLogResource extends JsonResource
             ],
             'document_id' => $this->id_dokumen,
             'aktivitas' => $this->aktivitas,
-            'waktu_aktivitas' => $this->waktu_aktivitas->format('Y-m-d H:i:s'),
+            'waktu_aktivitas' => date('Y-m-d H:i:s', strtotime($this->waktu_aktivitas)),
             'created_at' => $this->created_at->format('Y-m-d H:i:s'),
         ];
     }

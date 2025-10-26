@@ -7,15 +7,19 @@ use App\Models\Document;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use App\Traits\LogsActivity;
+use Illuminate\Support\Facades\Auth;
 
 class DocumentController extends Controller
 {
+    use LogsActivity;
+
     // GET /api/documents  (sekdes|kepdes)
     public function index(Request $request)
     {
         $docs = Document::query()
-            ->when($request->get('status'), fn($q,$v)=>$q->where('status',$v))
-            ->when($request->get('tipe'),   fn($q,$v)=>$q->where('tipe',$v))
+            ->when($request->get('status'), fn($q, $v) => $q->where('status', $v))
+            ->when($request->get('tipe'),   fn($q, $v) => $q->where('tipe', $v))
             ->latest()
             ->paginate($request->integer('per_page', 15));
 
@@ -26,6 +30,12 @@ class DocumentController extends Controller
     // GET /api/documents/{document}  (sekdes|kepdes)
     public function show(Document $document)
     {
+        $document = Document::with('user')->find($document->id);
+
+        if (!$document) {
+            return response()->json(['message' => 'Dokumen tidak ditemukan.'], 404);
+        }
+
         return new DocumentResource($document);
     }
 
@@ -33,82 +43,94 @@ class DocumentController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'tipe'               => ['nullable', Rule::in(['peraturan_desa','keputusan_kepala_desa'])],
-            'jenis_dokumen'      => ['nullable','string','max:150'],
-            'nomor_dokumen'      => ['nullable','string','max:150'],
-            'tanggal_ditetapkan' => ['nullable','date'],
-            'tentang'            => ['required','string'],
-            'uraian_singkat'     => ['nullable','string'],
-            'tanggal_dilaporkan' => ['nullable','date'],
-            'keterangan'         => ['nullable','string'],
-            'file_upload'        => ['required','file','mimes:pdf','max:20480'],
+            'tipe'               => ['nullable', Rule::in(['peraturan_desa', 'keputusan_kepala_desa'])],
+            'jenis_dokumen'      => ['nullable', 'string', 'max:150'],
+            'tentang'            => ['required', 'string'],
+            'uraian_singkat'     => ['nullable', 'string'],
+            'keterangan'         => ['nullable', 'string'],
+            'file_upload'        => ['required', 'file', 'mimes:pdf', 'max:20480'],
         ]);
 
         $path = $request->file('file_upload')->store('documents', 'public');
 
         $doc = Document::create([
-            'id_user'             => $request->user()->id,
-            'tipe'                => $validated['tipe'] ?? null,
-            'jenis_dokumen'       => $validated['jenis_dokumen'] ?? null,
-            'nomor_dokumen'       => $validated['nomor_dokumen'] ?? null,
-            'tanggal_ditetapkan'  => $validated['tanggal_ditetapkan'] ?? null,
-            'tentang'             => $validated['tentang'],
-            'uraian_singkat'      => $validated['uraian_singkat'] ?? null,
-            'tanggal_dilaporkan'  => $validated['tanggal_dilaporkan'] ?? null,
-            'keterangan'          => $validated['keterangan'] ?? null,
-            'file_upload'         => $path,
-            'status'              => 'Draft',
+            'id_user' => $request->user()?->id ?? Auth::id(),
+            'tipe' => $validated['tipe'] ?? 'peraturan_desa',
+            'jenis_dokumen' => $validated['jenis_dokumen'] ?? null,
+            'nomor_dokumen' => Document::generateNomorDokumen($validated['tipe'] ?? 'peraturan_desa'),
+            'tentang' => $validated['tentang'],
+            'uraian_singkat' => $validated['uraian_singkat'] ?? null,
+            'keterangan' => $validated['keterangan'] ?? null,
+            'file_upload' => $path,
+            'status' => 'Draft',
         ]);
+
+        $doc->logActivity('dibuat oleh ' . ($request->user()?->name ?? 'Sistem'));
 
         return (new DocumentResource($doc))->response()->setStatusCode(201);
     }
 
+
     // PUT /api/documents/{document}  (sekdes)  — hanya Draft/Ditolak
     public function update(Request $request, Document $document)
     {
-        if (!in_array($document->status, ['Draft','Ditolak'])) {
+        if (!in_array($document->status, ['Draft', 'Ditolak'])) {
             return response()->json(['message' => 'Hanya Draft/Ditolak yang bisa diubah.'], 422);
         }
 
         $validated = $request->validate([
-            'tipe'               => ['nullable', Rule::in(['peraturan_desa','keputusan_kepala_desa'])],
-            'jenis_dokumen'      => ['nullable','string','max:150'],
-            'nomor_dokumen'      => ['nullable','string','max:150'],
-            'tanggal_ditetapkan' => ['nullable','date'],
-            'tentang'            => ['required','string'],
-            'uraian_singkat'     => ['nullable','string'],
-            'tanggal_dilaporkan' => ['nullable','date'],
-            'keterangan'         => ['nullable','string'],
-            'file_upload'        => ['nullable','file','mimes:pdf','max:20480'],
+            'tipe'               => ['nullable', Rule::in(['peraturan_desa', 'keputusan_kepala_desa'])],
+            'jenis_dokumen'      => ['nullable', 'string', 'max:150'],
+            'tentang'            => ['required', 'string'],
+            'uraian_singkat'     => ['nullable', 'string'],
+            'keterangan'         => ['nullable', 'string'],
+            'file_upload'        => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
         ]);
 
         if ($request->hasFile('file_upload')) {
-            $document->file_upload = $request->file('file_upload')->store('documents', 'public');
+            $validated['file_upload'] = $request->file('file_upload')->store('documents', 'public');
         }
 
-        $document->fill([
-            'tipe'               => $validated['tipe']               ?? $document->tipe,
-            'jenis_dokumen'      => $validated['jenis_dokumen']      ?? $document->jenis_dokumen,
-            'nomor_dokumen'      => $validated['nomor_dokumen']      ?? $document->nomor_dokumen,
-            'tanggal_ditetapkan' => $validated['tanggal_ditetapkan'] ?? $document->tanggal_ditetapkan,
-            'tentang'            => $validated['tentang']            ?? $document->tentang,
-            'uraian_singkat'     => $validated['uraian_singkat']     ?? $document->uraian_singkat,
-            'tanggal_dilaporkan' => $validated['tanggal_dilaporkan'] ?? $document->tanggal_dilaporkan,
-            'keterangan'         => $validated['keterangan']         ?? $document->keterangan,
-        ])->save();
+        $document->update($validated);
+
+        $document->logActivity('diperbarui oleh ' . ($request->user()?->name ?? 'Sistem'));
 
         return new DocumentResource($document);
     }
 
-    // POST /api/documents/{document}/approve  (kepdes)
-    public function approve(Request $request, Document $document)
+
+    // DELETE /api/documents/{document}  (sekdes) — hanya Draft/Ditolak
+    public function destroy(Document $document)
     {
-        if ($document->status === 'Arsip') {
-            return response()->json(['message' => 'Dokumen arsip tidak bisa disetujui.'], 422);
+        if (!in_array($document->status, ['Draft', 'Ditolak'])) {
+            return response()->json(['message' => 'Hanya Draft/Ditolak yang bisa dihapus.'], 422);
         }
-        $document->update(['status' => 'Disetujui']);
+
+        if ($document->file_upload && Storage::disk('public')->exists($document->file_upload)) {
+            Storage::disk('public')->delete($document->file_upload);
+        }
+
+        $document->delete();
+        return response()->json(['message' => 'Dokumen dihapus.']);
+    }
+
+    // PUT /api/documents/{document}/approve  (kepdes)
+    public function approve(Document $document)
+    {
+        if ($document->status !== 'Draft') {
+            return response()->json(['message' => 'Hanya Draft yang bisa disetujui.'], 422);
+        }
+
+        $document->update([
+            'status' => 'Disetujui',
+            'nomor_dokumen' => Document::generateNomorDokumen($document->tipe),
+            'tanggal_ditetapkan' => now(),
+        ]);
+
+        $document->storeActivity('Dokumen disetujui oleh Kepala Desa');
         return response()->json(['message' => 'Dokumen disetujui.']);
     }
+
 
     // POST /api/documents/{document}/reject  (kepdes)
     public function reject(Request $request, Document $document)
@@ -118,25 +140,37 @@ class DocumentController extends Controller
         }
         $request->validate(['catatan' => 'nullable|string']);
         $document->update(['status' => 'Ditolak', 'keterangan' => $request->get('catatan')]);
+        $document->storeActivity('Dokumen ditolak oleh kepala desa');
         return response()->json(['message' => 'Dokumen ditolak.']);
     }
 
-    // POST /api/documents/{document}/publish  (sekdes) — status harus Disetujui
-    public function publish(Request $request, Document $document)
+    // PUT /api/documents/{document}/publish  (sekdes) — status harus Disetujui
+    public function publish(Document $document)
     {
         if ($document->status !== 'Disetujui') {
-            return response()->json(['message' => 'Hanya dokumen Disetujui yang dapat dipublish.'], 422);
+            return response()->json(['message' => 'Hanya dokumen Disetujui yang bisa dipublish.'], 422);
         }
 
-        $validated = $request->validate([
-            'tanggal_diundangkan' => ['required','date'],
-            'nomor_diundangkan'   => ['required','string','max:150'],
-            
-        ]);
+        if ($document->tipe === 'peraturan_desa') {
+            $document->update([
+                'nomor_diundangkan' => Document::generateNomorDiundangkan('peraturan_desa'),
+                'tanggal_diundangkan' => now(),
+            ]);
+            $document->storeActivity('Peraturan Desa diundangkan oleh Sekretaris Desa');
+        }
 
-        $document->update($validated);
-        return response()->json(['message' => 'Dokumen diundangkan.']);
+        if ($document->tipe === 'keputusan_kepala_desa') {
+            $document->update([
+                'nomor_dan_tanggal_dilaporkan' => Document::generateNomorDiundangkan('keputusan_kepala_desa'),
+            ]);
+            $document->storeActivity('Keputusan Kepala Desa dilaporkan oleh Sekretaris Desa');
+        }
+
+        $document->update(['status' => 'Publish']);
+
+        return response()->json(['message' => 'Dokumen berhasil dipublish.']);
     }
+
 
     // GET /api/documents/{document}/download  (sekdes|kepdes)
     public function download(Request $request, Document $document)
@@ -144,7 +178,8 @@ class DocumentController extends Controller
         if (!$document->file_upload) {
             return response()->json(['message' => 'File not found'], 404);
         }
-        return Storage::disk('public')->download($document->file_upload);
+        $path = storage_path('app/public/' . $document->file_upload);
+        return response()->download($path);
     }
 
     // ===== PUBLIK (tanpa auth) =====
@@ -152,7 +187,7 @@ class DocumentController extends Controller
     // GET /api/public/documents/{document}
     public function showPublic(Document $document)
     {
-        if (!in_array($document->status, ['Disetujui','Arsip'])) {
+        if (!in_array($document->status, ['Disetujui', 'Arsip'])) {
             return response()->json(['message' => 'Not found'], 404);
         }
         return new DocumentResource($document);
@@ -161,10 +196,11 @@ class DocumentController extends Controller
     // GET /api/public/documents/{document}/download
     public function downloadPublic(Document $document)
     {
-        if (!in_array($document->status, ['Disetujui','Arsip']) || !$document->file_upload) {
+        if (!in_array($document->status, ['Disetujui', 'Arsip']) || !$document->file_upload) {
             return response()->json(['message' => 'Not found'], 404);
         }
-        return Storage::disk('public')->download($document->file_upload);
+        $path = storage_path('app/public/' . $document->file_upload);
+        return response()->download($path);
     }
 
     // GET /api/laporan?tahun=YYYY  (sekdes|kepdes) — JSON rekap
@@ -174,7 +210,7 @@ class DocumentController extends Controller
 
         $data = Document::query()
             ->whereYear('tanggal_diundangkan', $tahun)
-            ->whereIn('status', ['Disetujui','Arsip'])
+            ->whereIn('status', ['Disetujui', 'Arsip'])
             ->orderBy('tanggal_diundangkan')
             ->get();
 

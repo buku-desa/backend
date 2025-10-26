@@ -14,18 +14,19 @@ return new class extends Migration
         Schema::create('documents', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('id_user');
+            $table->unsignedInteger('nomor_urut')->nullable();
             $table->enum('tipe', ['peraturan_desa', 'keputusan_kepala_desa'])->nullable(); // biar bisa bedain dua jenis
-            $table->string('jenis_dokumen')->nullable();
-            $table->string('nomor_dokumen')->nullable();
-            $table->date('tanggal_ditetapkan')->nullable();
-            $table->text('tentang')->nullable();
-            $table->text('uraian_singkat')->nullable();
-            $table->date('tanggal_dilaporkan')->nullable();
-            $table->date('tanggal_diundangkan')->nullable();
-            $table->string('nomor_diundangkan')->nullable();
-            $table->text('keterangan')->nullable();
+            $table->string('jenis_dokumen')->nullable(); // PERDES
+            $table->string('nomor_dokumen')->nullable(); // PERDES
+            $table->date('tanggal_ditetapkan')->nullable(); // PERDES
+            $table->text('tentang')->nullable(); // PERDES
+            $table->text('uraian_singkat')->nullable(); // KEKADES
+            $table->string('nomor_dan_tanggal_dilaporkan')->nullable(); // KEKADES -- publish
+            $table->string('nomor_diundangkan')->nullable(); // PERDES -- publish
+            $table->date('tanggal_diundangkan')->nullable(); // PERDES -- publish 
+            $table->text('keterangan')->nullable(); // 2-2nya
             $table->string('file_upload')->nullable();
-            $table->enum('status', ['Draft', 'Disetujui', 'Ditolak', 'Arsip'])->default('Draft');
+            $table->enum('status', ['Draft', 'Disetujui', 'Ditolak', 'Publish', 'Arsip'])->default('Draft');
             $table->timestamps();
 
             $table->foreign('id_user')->references('id')->on('users')->onDelete('cascade');
