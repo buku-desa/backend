@@ -13,8 +13,10 @@ class Document extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
+    // protected $casts = ['tanggal_ditetapkan'=>'date','tanggal_dilaporkan'=>'date','tanggal_diundangkan'=>'date'];
+
     protected $fillable = [
-        'type',
+        'tipe',
         'jenis_dokumen',
         'nomor_dokumen',
         'tanggal_ditetapkan',
@@ -50,4 +52,10 @@ class Document extends Model
     {
         return $this->hasMany(ActivityLog::class, 'id_dokumen');
     }
+
+    protected $casts = [
+    'tanggal_ditetapkan'  => 'date',
+    'tanggal_dilaporkan'  => 'date',
+    'tanggal_diundangkan' => 'date',
+    ];
 }
