@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ArsipController;
 
@@ -9,6 +10,11 @@ use App\Http\Controllers\ArsipController;
 Route::post('/login',  [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
+//activity log
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+    Route::get('/activity-logs/{id}', [ActivityLogController::class, 'show']);
+  
 // Publik (tanpa auth)
 Route::get('/public/documents/{document}', [DocumentController::class, 'showPublic']);
 Route::get('/public/documents/{document}/download', [DocumentController::class, 'downloadPublic']);
