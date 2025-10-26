@@ -14,6 +14,8 @@ class Archive extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
+    // protected $casts = ['tanggal_arsip' => 'date'];
+
     protected $fillable = [
         'id_dokumen',
         'user_id',
@@ -32,6 +34,10 @@ class Archive extends Model
     }
 
     public function document(){
-        return $this->belongsTo(Document::class, 'id_ref');
+        return $this->belongsTo(Document::class, 'id_dokumen');
     }
+
+    protected $casts = [
+    'tanggal_arsip' => 'date',
+    ];
 }
