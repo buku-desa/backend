@@ -100,7 +100,7 @@ class Document extends Model
     {
         // Pastikan statusnya sudah Disetujui sebelum bisa diarsipkan
         if ($this->status !== 'Publish') {
-            throw new \Exception('Hanya dokumen Disetujui yang bisa diarsipkan.');
+            throw new \Exception('Hanya dokumen Publish yang bisa diarsipkan.');
         }
 
         // Buat arsip baru otomatis

@@ -8,6 +8,7 @@ use App\Models\Document;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Traits\LogsActivity;
+use App\Events\DocumentStatusChanged;
 
 class ArsipController extends Controller
 {
@@ -35,7 +36,6 @@ class ArsipController extends Controller
     {
         $validated = $request->validate([
             'id_dokumen'    => ['required', 'uuid', 'exists:documents,id'],
-            'tanggal_arsip' => ['nullable', 'date'],
             'keterangan'    => ['nullable', 'string'],
         ]);
 
@@ -44,9 +44,11 @@ class ArsipController extends Controller
         try {
             $arsip = $doc->arsipkan(
                 $request->user()->id,
-                $validated['tanggal_arsip'] ?? null,
+                now(), // $validated['tanggal_arsip'] ,
                 $validated['keterangan'] ?? null
             );
+
+            event(new DocumentStatusChanged($doc, 'Diarsipkan', $doc->status));
 
             return (new ArchiveResource($arsip->load('document')))->response()->setStatusCode(201);
         } catch (\Exception $e) {

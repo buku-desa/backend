@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use App\Traits\LogsActivity;
 use Illuminate\Support\Facades\Auth;
+use App\Events\DocumentStatusChanged;
+use Illuminate\Support\Facades\Log;
 
 class DocumentController extends Controller
 {
@@ -43,9 +45,9 @@ class DocumentController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'jenis_dokumen'        => ['nullable', Rule::in(['peraturan_desa','peraturan_kepala_desa', 'peraturan_bersama_kepala_desa' ])],
-            'nomor_ditetapkan'     => ['required','string','max:150'],  
-            'tanggal_ditetapkan'   => ['required','date'],            
+            'jenis_dokumen'        => ['nullable', Rule::in(['peraturan_desa', 'peraturan_kepala_desa', 'peraturan_bersama_kepala_desa'])],
+            'nomor_ditetapkan'     => ['required', 'string', 'max:150'],
+            'tanggal_ditetapkan'   => ['required', 'date'],
             'tentang'              => ['required', 'string'],
             'keterangan'           => ['nullable', 'string'],
             'file_upload'          => ['required', 'file', 'mimes:pdf', 'max:20480'],
@@ -56,8 +58,8 @@ class DocumentController extends Controller
         $doc = Document::create([
             'id_user'             => $request->user()?->id ?? Auth::id(),
             'jenis_dokumen'       => $validated['jenis_dokumen'] ?? 'peraturan_desa',
-            'nomor_ditetapkan'    => $validated['nomor_ditetapkan'],      
-            'tanggal_ditetapkan'  => $validated['tanggal_ditetapkan'],   
+            'nomor_ditetapkan'    => $validated['nomor_ditetapkan'],
+            'tanggal_ditetapkan'  => $validated['tanggal_ditetapkan'],
             'tentang'             => $validated['tentang'],
             // 'uraian_singkat'      => $validated['uraian_singkat'] ?? null,
             'keterangan'          => $validated['keterangan'] ?? null,
@@ -66,6 +68,9 @@ class DocumentController extends Controller
         ]);
 
         $doc->logActivity('dibuat oleh ' . ($request->user()?->name ?? 'Sistem'));
+
+        //baru
+        event(new DocumentStatusChanged($doc, null, 'Draft'));
 
         return (new DocumentResource($doc))->response()->setStatusCode(201);
     }
@@ -80,8 +85,11 @@ class DocumentController extends Controller
 
         $validated = $request->validate([
             'jenis_dokumen'        => ['nullable', Rule::in(['peraturan_desa', 'peraturan_kepala_desa', 'peraturan_bersama_kepala_desa'])],
-            'nomor_ditetapkan'     => ['sometimes','string','max:150'],  
-            'tanggal_ditetapkan'   => ['sometimes','date'],               
+            'nomor_ditetapkan'     => ['sometimes', 'string', 'max:150'],
+            'tanggal_ditetapkan'   => ['sometimes', 'date'],
+            'tentang'              => ['sometimes', 'string'],
+            'nomor_ditetapkan'     => ['sometimes', 'string', 'max:150'],
+            'tanggal_ditetapkan'   => ['sometimes', 'date'],
             'tentang'              => ['sometimes', 'string'],
             'keterangan'           => ['nullable', 'string'],
             'file_upload'          => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
@@ -95,9 +103,21 @@ class DocumentController extends Controller
             $validated['file_upload'] = $request->file('file_upload')->store('documents', 'public');
         }
 
+        $oldStatus = $document->status;
+
+        // Jika sebelumnya Ditolak → ubah ke Draft lagi (artinya diajukan ulang)
+        if ($oldStatus === 'Ditolak') {
+            $validated['status'] = 'Draft';
+        }
+
         $document->update($validated);
 
         $document->logActivity('diperbarui oleh ' . ($request->user()?->name ?? 'Sistem'));
+
+        //baru
+        if ($oldStatus === 'Ditolak' && $document->status === 'Draft') {
+            event(new DocumentStatusChanged($document, 'Ditolak', 'Draft'));
+        }
 
         return new DocumentResource($document);
     }
@@ -138,6 +158,10 @@ class DocumentController extends Controller
         ]);
 
         $document->logActivity('Dokumen disetujui oleh Kepala Desa');
+
+        //baru
+        event(new DocumentStatusChanged($document, $document->status, 'Disetujui'));
+
         return response()->json(['message' => 'Dokumen disetujui.']);
     }
 
@@ -152,6 +176,10 @@ class DocumentController extends Controller
         $request->validate(['catatan' => 'nullable|string']);
         $document->update(['status' => 'Ditolak', 'keterangan' => $request->get('catatan')]);
         $document->storeActivity('Dokumen ditolak oleh kepala desa');
+
+        //baru
+        event(new DocumentStatusChanged($document, $document->status, 'Ditolak'));
+
         return response()->json(['message' => 'Dokumen ditolak.']);
     }
 
@@ -177,6 +205,9 @@ class DocumentController extends Controller
             : 'Berita Desa'; // peraturan_kepala_desa / peraturan_bersama_kepala_desa
 
         $document->logActivity("Diundangkan ke {$label} oleh Sekretaris Desa");
+
+        //baru
+        event(new DocumentStatusChanged($document, 'Disetujui', 'Publish'));
 
         // (opsional) kirim juga nomor diundangkan display agar FE langsung bisa pakai
         return response()->json([
