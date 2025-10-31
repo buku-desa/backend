@@ -20,7 +20,7 @@ class DocumentController extends Controller
     {
         $docs = Document::query()
             ->when($request->get('status'), fn($q, $v) => $q->where('status', $v))
-            ->when($request->get('tipe'),   fn($q, $v) => $q->where('tipe', $v))
+            ->when($request->get('jenis_dokumen'),   fn($q, $v) => $q->where('jenis_dokumen', $v))
             ->latest()
             ->paginate($request->integer('per_page', 15));
 
@@ -87,11 +87,18 @@ class DocumentController extends Controller
             'nomor_ditetapkan'     => ['sometimes','string','max:150'],
             'tanggal_ditetapkan'   => ['sometimes','date'],
             'tentang'              => ['required', 'string'],
+            'nomor_ditetapkan'     => ['sometimes','string','max:150'],
+            'tanggal_ditetapkan'   => ['sometimes','date'],
+            'tentang'              => ['sometimes', 'string'],
             'keterangan'           => ['nullable', 'string'],
             'file_upload'          => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
         ]);
 
         if ($request->hasFile('file_upload')) {
+            // hapus file lama jika ada
+            if ($document->file_upload && Storage::disk('public')->exists($document->file_upload)) {
+                Storage::disk('public')->delete($document->file_upload);
+            }
             $validated['file_upload'] = $request->file('file_upload')->store('documents', 'public');
         }
 
@@ -139,7 +146,7 @@ class DocumentController extends Controller
         }
 
         // Pastikan field krusial sudah ada (kalau kamu buat required di store, cek ini opsional)
-        if (empty($document->nomor_dokumen) || empty($document->tanggal_ditetapkan)) {
+        if (empty($document->nomor_ditetapkan) || empty($document->tanggal_ditetapkan)) {
             return response()->json([
                 'message' => 'Nomor ditetapkan dan tanggal ditetapkan harus diisi sebelum persetujuan.'
             ], 422);
@@ -149,7 +156,7 @@ class DocumentController extends Controller
             'status' => 'Disetujui',
         ]);
 
-        $document->storeActivity('Dokumen disetujui oleh Kepala Desa');
+        $document->logActivity('Dokumen disetujui oleh Kepala Desa');
 
         //baru
         event(new DocumentStatusChanged($document, $document->status, 'Disetujui'));
@@ -196,7 +203,7 @@ class DocumentController extends Controller
             ? 'Lembaran Desa'
             : 'Berita Desa'; // peraturan_kepala_desa / peraturan_bersama_kepala_desa
 
-        $document->storeActivity("Diundangkan ke {$label} oleh Sekretaris Desa");
+        $document->logActivity("Diundangkan ke {$label} oleh Sekretaris Desa");
 
         // (opsional) kirim juga nomor diundangkan display agar FE langsung bisa pakai
         return response()->json([
@@ -227,7 +234,7 @@ class DocumentController extends Controller
     // GET /api/public/documents/{document}
     public function showPublic(Document $document)
     {
-        if (!in_array($document->status, ['Disetujui', 'Arsip'])) {
+        if (!in_array($document->status, ['Publish', 'Arsip'])) {
             return response()->json(['message' => 'Not found'], 404);
         }
         return new DocumentResource($document);
@@ -236,7 +243,7 @@ class DocumentController extends Controller
     // GET /api/public/documents/{document}/download
     public function downloadPublic(Document $document)
     {
-        if (!in_array($document->status, ['Disetujui', 'Arsip']) || !$document->file_upload) {
+        if (!in_array($document->status, ['Publish', 'Arsip']) || !$document->file_upload) {
             return response()->json(['message' => 'Not found'], 404);
         }
         $path = storage_path('app/public/' . $document->file_upload);
@@ -250,7 +257,7 @@ class DocumentController extends Controller
 
         $data = Document::query()
             ->whereYear('tanggal_diundangkan', $tahun)
-            ->whereIn('status', ['Disetujui', 'Arsip'])
+            ->whereIn('status', ['Publish', 'Arsip'])
             ->orderBy('tanggal_diundangkan')
             ->get();
 
