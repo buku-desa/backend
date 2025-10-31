@@ -36,9 +36,10 @@ class Archive extends Model
 
             $doc = $model->document ?? \App\Models\Document::find($model->id_dokumen);
 
-            $prefix = match ($doc?->tipe) {
+            $prefix = match ($doc?->jenis_dokumen) {
                 'peraturan_desa' => 'PD',
-                'keputusan_kepala_desa' => 'KD',
+                'peraturan_kepala_desa' => 'KD',
+                'peraturan_bersama_kepala_desa' => 'PBD',
                 default => 'AR',
             };
 

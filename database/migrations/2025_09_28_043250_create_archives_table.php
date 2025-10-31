@@ -19,7 +19,6 @@ return new class extends Migration
             $table->date('tanggal_arsip')->nullable();
             $table->text('keterangan')->nullable();
             $table->timestamps();
-
             $table->foreign('id_dokumen')->references('id')->on('documents')->onDelete('cascade');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });

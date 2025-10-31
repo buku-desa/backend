@@ -99,7 +99,7 @@ class Document extends Model
     public function arsipkan($userId, $tanggal_arsip = null, $keterangan = null)
     {
         // Pastikan statusnya sudah Disetujui sebelum bisa diarsipkan
-        if ($this->status !== 'Disetujui') {
+        if ($this->status !== 'Publish') {
             throw new \Exception('Hanya dokumen Disetujui yang bisa diarsipkan.');
         }
 
@@ -115,7 +115,7 @@ class Document extends Model
         $this->update(['status' => 'Arsip']);
 
         // Catat aktivitas
-        $this->storeActivity('diarsipkan oleh sekretaris desa');
+        $this->logActivity('diarsipkan oleh sekretaris desa');
 
         return $arsip;
     }
