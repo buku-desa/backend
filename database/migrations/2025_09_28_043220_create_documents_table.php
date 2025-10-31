@@ -15,14 +15,11 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->uuid('id_user');
             $table->unsignedInteger('nomor_urut')->nullable();
-            $table->enum('tipe', ['peraturan_desa', 'keputusan_kepala_desa'])->nullable(); // biar bisa bedain dua jenis
-            $table->string('jenis_dokumen')->nullable(); // PERDES
-            $table->string('nomor_dokumen')->nullable(); // PERDES
+            $table->enum('jenis_dokumen', ['peraturan_desa', 'peraturan_kepala_desa', 'peraturan_bersama_kepala_desa'])->nullable(); // biar bisa bedain dua jenis
+            $table->string('nomor_ditetapkan')->nullable(); // PERDES
             $table->date('tanggal_ditetapkan')->nullable(); // PERDES
             $table->text('tentang')->nullable(); // PERDES
-            $table->text('uraian_singkat')->nullable(); // KEKADES
-            $table->string('nomor_dan_tanggal_dilaporkan')->nullable(); // KEKADES -- publish
-            $table->string('nomor_diundangkan')->nullable(); // PERDES -- publish
+            $table->integer('nomor_diundangkan')->nullable(); // PERDES -- publish
             $table->date('tanggal_diundangkan')->nullable(); // PERDES -- publish 
             $table->text('keterangan')->nullable(); // 2-2nya
             $table->string('file_upload')->nullable();

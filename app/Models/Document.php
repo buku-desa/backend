@@ -19,13 +19,13 @@ class Document extends Model
     // protected $casts = ['tanggal_ditetapkan'=>'date','tanggal_dilaporkan'=>'date','tanggal_diundangkan'=>'date'];
 
     protected $fillable = [
-        'tipe',
+        // 'tipe',
         'jenis_dokumen',
-        'nomor_dokumen',
+        'nomor_ditetapkan',
         'tanggal_ditetapkan',
         'tentang',
-        'uraian_singkat',
-        'nomor_dan_tanggal_dilaporkan',
+        // 'uraian_singkat',
+        // 'nomor_dan_tanggal_dilaporkan',
         'nomor_diundangkan',
         'tanggal_diundangkan',
         'keterangan',
@@ -55,40 +55,38 @@ class Document extends Model
                 $model->{$model->getKeyName()} = (string) Str::uuid();
             }
 
-            if (empty($model->nomor_urut) && !empty($model->tipe)) {
-                $lastNumber = self::where('tipe', $model->tipe)->max('nomor_urut');
+            if (empty($model->nomor_urut) && !empty($model->jenis_dokumen)) {
+                $lastNumber = self::where('jenis_dokumen', $model->jenis_dokumen)->max('nomor_urut');
                 $model->nomor_urut = $lastNumber ? $lastNumber + 1 : 1;
             }
         });
     }
 
-    public static function generateNomorDokumen($tipe)
+
+    // ==== Tambahkan/ubah helper penomoran diundangkan (INT) ====
+    public static function nextNomorDiundangkan(string $jenis): int
     {
         $tahun = now()->year;
-        $prefix = $tipe === 'peraturan_desa' ? 'PERDES' : 'KEPKADES';
 
-        // PostgreSQL version
-        $lastNomor = self::where('tipe', $tipe)
-            ->whereYear('created_at', $tahun)
-            ->whereNotNull('nomor_dokumen')
-            ->max(DB::raw("CAST(split_part(nomor_dokumen, '/', 3) AS INTEGER)"));
-
-        $nextNomor = ($lastNomor ?? 0) + 1;
-
-        return sprintf('%s/%d/%03d', $prefix, $tahun, $nextNomor);
-    }
-
-
-    public static function generateNomorDiundangkan($tipe)
-    {
-        $tahun = now()->year;
-        $prefix = $tipe === 'peraturan_desa' ? 'LD' : 'BD'; // Lembaran Desa / Berita Desa
-        $count = self::where('tipe', $tipe)
+        // Ambil nomor maksimum di tahun & jenis yang sama lalu +1
+        $max = self::where('jenis_dokumen', $jenis)
             ->whereYear('tanggal_diundangkan', $tahun)
-            ->count() + 1;
+            ->max('nomor_diundangkan');
 
-        return sprintf('%s/%d/%03d', $prefix, $tahun, $count);
+        return (int)($max ?? 0) + 1;
     }
+
+    // ==== (Opsional tapi sangat berguna) accessor tampilan nomor ====
+    public function getNomorDiundangkanDisplayAttribute(): ?string
+    {
+        if (is_null($this->nomor_diundangkan) || is_null($this->tanggal_diundangkan)) {
+            return null;
+        }
+        $year   = $this->tanggal_diundangkan->year;
+        $prefix = $this->jenis_dokumen === 'peraturan_desa' ? 'LD' : 'BD'; // Lembaran vs Berita Desa
+        return sprintf('%s/%d/%03d', $prefix, $year, $this->nomor_diundangkan);
+    }
+
 
     protected $casts = [
         'tanggal_ditetapkan' => 'date',

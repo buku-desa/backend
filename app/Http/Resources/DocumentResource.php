@@ -10,14 +10,14 @@ class DocumentResource extends JsonResource
     {
         return [
             'id'                  => $this->id,
-            'tipe'                => $this->tipe,
+            // 'tipe'                => $this->tipe,
             'nomor_urut'         => $this->nomor_urut,
             'jenis_dokumen'       => $this->jenis_dokumen,
-            'nomor_dokumen'       => $this->nomor_dokumen,
+            'nomor_ditetapkan'       => $this->nomor_ditetapkan,
             'tanggal_ditetapkan'  => optional($this->tanggal_ditetapkan)->toDateString(),
             'tentang'             => $this->tentang,
-            'uraian_singkat'      => $this->uraian_singkat,
-            'nomor_tanggal_dilaporkan'  => optional($this->nomor_tanggal_dilaporkan)->toDateString(),
+            // 'uraian_singkat'      => $this->uraian_singkat,
+            // 'nomor_tanggal_dilaporkan'  => optional($this->nomor_tanggal_dilaporkan)->toDateString(),
             'tanggal_diundangkan' => optional($this->tanggal_diundangkan)->toDateString(),
             'nomor_diundangkan'   => $this->nomor_diundangkan,
             'keterangan'          => $this->keterangan,
