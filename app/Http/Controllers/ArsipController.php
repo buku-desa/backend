@@ -8,6 +8,7 @@ use App\Models\Document;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Traits\LogsActivity;
+use App\Events\DocumentStatusChanged;
 
 class ArsipController extends Controller
 {
@@ -47,6 +48,8 @@ class ArsipController extends Controller
                 $validated['tanggal_arsip'] ?? null,
                 $validated['keterangan'] ?? null
             );
+
+            event(new DocumentStatusChanged($doc, 'Diarsipkan', $doc->status));
 
             return (new ArchiveResource($arsip->load('document')))->response()->setStatusCode(201);
         } catch (\Exception $e) {
