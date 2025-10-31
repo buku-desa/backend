@@ -21,8 +21,8 @@ class SendDocumentStatusEmail
         $doc = $event->document;
 
         // Ambil user berdasarkan role (pastikan nama role sesuai di tabel)
-        $kepdes = User::whereHas('roles', fn($q) => $q->where('name', 'Kepala Desa'))->first();
-        $sekdes = User::whereHas('roles', fn($q) => $q->where('name', 'Sekretaris Desa'))->first();
+        $kepdes = User::where('role', 'kepdes')->first();
+        $sekdes = User::where('role', 'sekdes')->first();
 
         switch ($event->newStatus) {
             case 'Draft':

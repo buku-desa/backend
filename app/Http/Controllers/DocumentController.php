@@ -10,6 +10,7 @@ use Illuminate\Validation\Rule;
 use App\Traits\LogsActivity;
 use Illuminate\Support\Facades\Auth;
 use App\Events\DocumentStatusChanged;
+use Illuminate\Support\Facades\Log;
 
 class DocumentController extends Controller
 {
@@ -44,9 +45,9 @@ class DocumentController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'jenis_dokumen'        => ['nullable', Rule::in(['peraturan_desa','peraturan_kepala_desa', 'peraturan_bersama_kepala_desa' ])],
-            'nomor_ditetapkan'     => ['required','string','max:150'],
-            'tanggal_ditetapkan'   => ['required','date'],
+            'jenis_dokumen'        => ['nullable', Rule::in(['peraturan_desa', 'peraturan_kepala_desa', 'peraturan_bersama_kepala_desa'])],
+            'nomor_ditetapkan'     => ['required', 'string', 'max:150'],
+            'tanggal_ditetapkan'   => ['required', 'date'],
             'tentang'              => ['required', 'string'],
             'keterangan'           => ['nullable', 'string'],
             'file_upload'          => ['required', 'file', 'mimes:pdf', 'max:20480'],
@@ -84,11 +85,11 @@ class DocumentController extends Controller
 
         $validated = $request->validate([
             'jenis_dokumen'        => ['nullable', Rule::in(['peraturan_desa', 'peraturan_kepala_desa', 'peraturan_bersama_kepala_desa'])],
-            'nomor_ditetapkan'     => ['sometimes','string','max:150'],
-            'tanggal_ditetapkan'   => ['sometimes','date'],
-            'tentang'              => ['required', 'string'],
-            'nomor_ditetapkan'     => ['sometimes','string','max:150'],
-            'tanggal_ditetapkan'   => ['sometimes','date'],
+            'nomor_ditetapkan'     => ['sometimes', 'string', 'max:150'],
+            'tanggal_ditetapkan'   => ['sometimes', 'date'],
+            'tentang'              => ['sometimes', 'string'],
+            'nomor_ditetapkan'     => ['sometimes', 'string', 'max:150'],
+            'tanggal_ditetapkan'   => ['sometimes', 'date'],
             'tentang'              => ['sometimes', 'string'],
             'keterangan'           => ['nullable', 'string'],
             'file_upload'          => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
@@ -204,6 +205,9 @@ class DocumentController extends Controller
             : 'Berita Desa'; // peraturan_kepala_desa / peraturan_bersama_kepala_desa
 
         $document->logActivity("Diundangkan ke {$label} oleh Sekretaris Desa");
+
+        //baru
+        event(new DocumentStatusChanged($document, 'Disetujui', 'Publish'));
 
         // (opsional) kirim juga nomor diundangkan display agar FE langsung bisa pakai
         return response()->json([

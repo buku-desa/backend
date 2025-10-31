@@ -1,26 +1,25 @@
-@extends('emails.layouts.email')
+@extends('emails.layouts.base')
+
+@section('title', 'Dokumen Diarsipkan')
 
 @section('content')
-    <h2>📁 Dokumen Telah Diarsipkan</h2>
+    <h2 style="color:#1e3a8a;">Halo,</h2>
 
-    <p>Halo,</p>
+    <p>Dokumen <strong>{{ $document->tentang }}</strong> telah <strong style="color:#6b7280;">diarsipkan</strong>.</p>
 
-    <p>Dokumen berikut telah resmi <strong>diarsipkan</strong> dalam sistem Lembaran Desa dan Berita Desa (LDBD):</p>
+    <div style="background-color:#f3f4f6; padding:15px; border-radius:8px; margin:15px 0;">
+        <p style="margin:5px 0;"><strong>Jenis Dokumen:</strong>
+            {{ ucwords(str_replace('_', ' ', $document->jenis_dokumen)) }}</p>
+        <p style="margin:5px 0;"><strong>Nomor Diundangkan:</strong> {{ $document->nomor_diundangkan_display }}</p>
+        <p style="margin:5px 0;"><strong>Tanggal Diundangkan:</strong>
+            {{ $document->tanggal_diundangkan ? \Carbon\Carbon::parse($document->tanggal_diundangkan)->format('d F Y') : '-' }}
+        </p>
+    </div>
 
-    <ul>
-        <li><strong>Jenis Dokumen:</strong> {{ ucfirst(str_replace('_', ' ', $document->tipe)) }}</li>
-        <li><strong>Tentang:</strong> {{ $document->tentang }}</li>
-        <li><strong>Status:</strong> {{ $document->status }}</li>
-        @if ($document->nomor_dokumen)
-            <li><strong>Nomor Dokumen:</strong> {{ $document->nomor_dokumen }}</li>
-        @endif
-        @if ($document->tanggal_diundangkan)
-            <li><strong>Tanggal Diundangkan:</strong>
-                {{ \Carbon\Carbon::parse($document->tanggal_diundangkan)->format('d M Y') }}</li>
-        @endif
-    </ul>
+    <p>Dokumen ini tetap dapat diakses dalam arsip sistem.</p>
 
-    <p>Dokumen ini kini tersimpan dalam arsip dan dapat diakses kembali melalui sistem sesuai kewenangan Anda.</p>
-
-    <p>Terima kasih atas kerja samanya dalam menjaga tata kelola administrasi desa.</p>
+    <a href="{{ $documentUrl }}"
+        style="display:inline-block; background-color:#6b7280; color:#fff; text-decoration:none; padding:10px 18px; border-radius:8px; margin-top:10px;">
+        Lihat Dokumen
+    </a>
 @endsection

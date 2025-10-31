@@ -26,12 +26,12 @@ Route::middleware(['auth:sanctum', 'role:kepdes'])->group(function () {
 Route::middleware(['auth:sanctum', 'role:sekdes,kepdes'])->group(function () {
 
     Route::post('/documents', [DocumentController::class, 'store']); #bisa
-    Route::put('/documents/{id}', [DocumentController::class, 'update']); #bisa
+    Route::put('/documents/{document}', [DocumentController::class, 'update']); #bisa
     Route::delete('/documents/{document}', [DocumentController::class, 'destroy']); #bisa
     Route::put('/documents/{document}/publish', [DocumentController::class, 'publish']);
     Route::get('/documents/{document}/download', [DocumentController::class, 'download']); #bisa
 
-    Route::post('/archives', [ArsipController::class, 'store']); #bisa 
+    Route::post('/archives', [ArsipController::class, 'store']); #bisa
     Route::get('/archives', [ArsipController::class, 'index']); #bisa
     Route::get('/archives/{archive}', [ArsipController::class, 'show']); #bisa
 

@@ -3,11 +3,28 @@
 @section('title', 'Dokumen Ditolak')
 
 @section('content')
-    <h2 style="color:#1e3a8a;">Halo Sekretaris Desa,</h2>
-    <p>Dokumen yang Anda ajukan telah <strong style="color:#dc2626;">ditolak oleh Kepala Desa</strong> setelah proses
-        peninjauan.</p>
-    <p>Silakan lakukan perbaikan sesuai catatan yang diberikan, lalu ajukan kembali.</p>
-    <a href="{{ url('/') }}"
-        style="display:inline-block; background-color:#dc2626; color:#fff; text-decoration:none; padding:10px 18px; border-radius:8px;">Perbaiki
-        Dokumen</a>
+    <h2 style="color:#1e3a8a;">Halo, Sekretaris Desa</h2>
+
+    <p>Dokumen <strong>{{ $document->tentang }}</strong> telah <strong style="color:#dc2626;">ditolak</strong> oleh Kepala
+        Desa.</p>
+
+    <div style="background-color:#fee2e2; border-left:4px solid #dc2626; padding:15px; border-radius:8px; margin:15px 0;">
+        <p style="margin:5px 0; font-weight:600; color:#991b1b;">Catatan Penolakan:</p>
+        <p style="margin:5px 0; color:#7f1d1d;">{{ $document->keterangan ?? 'Tidak ada catatan.' }}</p>
+    </div>
+
+    <div style="background-color:#f3f4f6; padding:15px; border-radius:8px; margin:15px 0;">
+        <p style="margin:5px 0;"><strong>Jenis Dokumen:</strong>
+            {{ ucwords(str_replace('_', ' ', $document->jenis_dokumen)) }}</p>
+        <p style="margin:5px 0;"><strong>Nomor Ditetapkan:</strong> {{ $document->nomor_ditetapkan }}</p>
+        <p style="margin:5px 0;"><strong>Tanggal Ditetapkan:</strong>
+            {{ \Carbon\Carbon::parse($document->tanggal_ditetapkan)->format('d F Y') }}</p>
+    </div>
+
+    <p>Silakan lakukan revisi dan ajukan kembali dokumen ini.</p>
+
+    <a href="{{ $documentUrl }}"
+        style="display:inline-block; background-color:#1d4ed8; color:#fff; text-decoration:none; padding:10px 18px; border-radius:8px; margin-top:10px;">
+        Revisi Dokumen
+    </a>
 @endsection
