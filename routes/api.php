@@ -16,16 +16,6 @@ Route::get('/documents/{document}', [DocumentController::class, 'show']); #bisa
 Route::get('/public/documents/{document}', [DocumentController::class, 'showPublic']);
 Route::get('/public/documents/{document}/download', [DocumentController::class, 'downloadPublic']);
 
-// Sekdes-only
-// Route::middleware(['auth:sanctum','role:sekdes'])->group(function () {
-//     Route::post('/documents', [DocumentController::class, 'store']);
-//     Route::put('/documents/{document}', [DocumentController::class, 'update']);
-//     Route::post('/documents/{document}/publish', [DocumentController::class, 'publish']);
-//     Route::get('/documents/{document}/download', [DocumentController::class, 'download']);
-
-//     Route::post('/archives', [ArsipController::class, 'store']);
-// });
-
 // Kepdes-only
 Route::middleware(['auth:sanctum', 'role:kepdes'])->group(function () {
     Route::put('/documents/{document}/approve', [DocumentController::class, 'approve']); #bisa
@@ -34,8 +24,6 @@ Route::middleware(['auth:sanctum', 'role:kepdes'])->group(function () {
 
 // Sekdes & Kepdes
 Route::middleware(['auth:sanctum', 'role:sekdes,kepdes'])->group(function () {
-    // Route::get('/documents', [DocumentController::class, 'index']); #bisa
-    // Route::get('/documents/{document}', [DocumentController::class, 'show']); #bisa
 
     Route::post('/documents', [DocumentController::class, 'store']); #bisa
     Route::put('/documents/{id}', [DocumentController::class, 'update']); #bisa

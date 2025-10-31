@@ -43,26 +43,26 @@ class DocumentController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'tipe'               => ['nullable', Rule::in(['peraturan_desa', 'keputusan_kepala_desa'])],
-            'jenis_dokumen'      => ['nullable', 'string', 'max:150'],
-            'tentang'            => ['required', 'string'],
-            'uraian_singkat'     => ['nullable', 'string'],
-            'keterangan'         => ['nullable', 'string'],
-            'file_upload'        => ['required', 'file', 'mimes:pdf', 'max:20480'],
+            'jenis_dokumen'        => ['nullable', Rule::in(['peraturan_desa','peraturan_kepala_desa', 'peraturan_bersama_kepala_desa' ])],
+            'nomor_ditetapkan'     => ['required','string','max:150'],  
+            'tanggal_ditetapkan'   => ['required','date'],            
+            'tentang'              => ['required', 'string'],
+            'keterangan'           => ['nullable', 'string'],
+            'file_upload'          => ['required', 'file', 'mimes:pdf', 'max:20480'],
         ]);
 
         $path = $request->file('file_upload')->store('documents', 'public');
 
         $doc = Document::create([
-            'id_user' => $request->user()?->id ?? Auth::id(),
-            'tipe' => $validated['tipe'] ?? 'peraturan_desa',
-            'jenis_dokumen' => $validated['jenis_dokumen'] ?? null,
-            'nomor_dokumen' => Document::generateNomorDokumen($validated['tipe'] ?? 'peraturan_desa'),
-            'tentang' => $validated['tentang'],
-            'uraian_singkat' => $validated['uraian_singkat'] ?? null,
-            'keterangan' => $validated['keterangan'] ?? null,
-            'file_upload' => $path,
-            'status' => 'Draft',
+            'id_user'             => $request->user()?->id ?? Auth::id(),
+            'jenis_dokumen'       => $validated['jenis_dokumen'] ?? 'peraturan_desa',
+            'nomor_ditetapkan'    => $validated['nomor_ditetapkan'],      
+            'tanggal_ditetapkan'  => $validated['tanggal_ditetapkan'],   
+            'tentang'             => $validated['tentang'],
+            // 'uraian_singkat'      => $validated['uraian_singkat'] ?? null,
+            'keterangan'          => $validated['keterangan'] ?? null,
+            'file_upload'         => $path,
+            'status'              => 'Draft',
         ]);
 
         $doc->logActivity('dibuat oleh ' . ($request->user()?->name ?? 'Sistem'));
@@ -79,12 +79,12 @@ class DocumentController extends Controller
         }
 
         $validated = $request->validate([
-            'tipe'               => ['nullable', Rule::in(['peraturan_desa', 'keputusan_kepala_desa'])],
-            'jenis_dokumen'      => ['nullable', 'string', 'max:150'],
-            'tentang'            => ['required', 'string'],
-            'uraian_singkat'     => ['nullable', 'string'],
-            'keterangan'         => ['nullable', 'string'],
-            'file_upload'        => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+            'jenis_dokumen'        => ['nullable', Rule::in(['peraturan_desa', 'peraturan_kepala_desa', 'peraturan_bersama_kepala_desa'])],
+            'nomor_ditetapkan'     => ['sometimes','string','max:150'],  
+            'tanggal_ditetapkan'   => ['sometimes','date'],               
+            'tentang'              => ['required', 'string'],
+            'keterangan'           => ['nullable', 'string'],
+            'file_upload'          => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
         ]);
 
         if ($request->hasFile('file_upload')) {
@@ -97,6 +97,7 @@ class DocumentController extends Controller
 
         return new DocumentResource($document);
     }
+
 
 
     // DELETE /api/documents/{document}  (sekdes) — hanya Draft/Ditolak
@@ -121,15 +122,21 @@ class DocumentController extends Controller
             return response()->json(['message' => 'Hanya Draft yang bisa disetujui.'], 422);
         }
 
+        // Pastikan field krusial sudah ada (kalau kamu buat required di store, cek ini opsional)
+        if (empty($document->nomor_dokumen) || empty($document->tanggal_ditetapkan)) {
+            return response()->json([
+                'message' => 'Nomor ditetapkan dan tanggal ditetapkan harus diisi sebelum persetujuan.'
+            ], 422);
+        }
+
         $document->update([
             'status' => 'Disetujui',
-            'nomor_dokumen' => Document::generateNomorDokumen($document->tipe),
-            'tanggal_ditetapkan' => now(),
         ]);
 
         $document->storeActivity('Dokumen disetujui oleh Kepala Desa');
         return response()->json(['message' => 'Dokumen disetujui.']);
     }
+
 
 
     // POST /api/documents/{document}/reject  (kepdes)
@@ -151,26 +158,35 @@ class DocumentController extends Controller
             return response()->json(['message' => 'Hanya dokumen Disetujui yang bisa dipublish.'], 422);
         }
 
-        if ($document->tipe === 'peraturan_desa') {
-            $document->update([
-                'nomor_diundangkan' => Document::generateNomorDiundangkan('peraturan_desa'),
-                'tanggal_diundangkan' => now(),
-            ]);
-            $document->storeActivity('Peraturan Desa diundangkan oleh Sekretaris Desa');
-        }
+        // Tentukan nomor_diundangkan (INT) berikutnya per (jenis_dokumen, tahun)
+        $nextNumber = \App\Models\Document::nextNomorDiundangkan($document->jenis_dokumen);
 
-        if ($document->tipe === 'keputusan_kepala_desa') {
-            $document->update([
-                'nomor_dan_tanggal_dilaporkan' => Document::generateNomorDiundangkan('keputusan_kepala_desa'),
-            ]);
-            $document->storeActivity('Keputusan Kepala Desa dilaporkan oleh Sekretaris Desa');
-        }
+        $document->update([
+            'nomor_diundangkan'   => $nextNumber,      // INT sesuai skema
+            'tanggal_diundangkan' => now(),            // tanggal publish
+            'status'              => 'Publish',        // enum sudah mengizinkan Publish
+        ]);
 
-        $document->update(['status' => 'Publish']);
+        // Catat activity yang informatif
+        $label = $document->jenis_dokumen === 'peraturan_desa'
+            ? 'Lembaran Desa'
+            : 'Berita Desa'; // peraturan_kepala_desa / peraturan_bersama_kepala_desa
 
-        return response()->json(['message' => 'Dokumen berhasil dipublish.']);
+        $document->storeActivity("Diundangkan ke {$label} oleh Sekretaris Desa");
+
+        // (opsional) kirim juga nomor diundangkan display agar FE langsung bisa pakai
+        return response()->json([
+            'message' => 'Dokumen berhasil dipublish.',
+            'data'    => [
+                'id'                        => $document->id,
+                'jenis_dokumen'             => $document->jenis_dokumen,
+                'nomor_diundangkan'         => $document->nomor_diundangkan,             // integer murni
+                'nomor_diundangkan_display' => $document->nomor_diundangkan_display,     // e.g. LD/2025/005
+                'tanggal_diundangkan'       => $document->tanggal_diundangkan?->toDateString(),
+                'status'                    => $document->status,
+            ]
+        ]);
     }
-
 
     // GET /api/documents/{document}/download  (sekdes|kepdes)
     public function download(Request $request, Document $document)
