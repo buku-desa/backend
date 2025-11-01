@@ -99,8 +99,8 @@ class Document extends Model
     public function arsipkan($userId, $tanggal_arsip = null, $keterangan = null)
     {
         // Pastikan statusnya sudah Disetujui sebelum bisa diarsipkan
-        if ($this->status !== 'Publish') {
-            throw new \Exception('Hanya dokumen Publish yang bisa diarsipkan.');
+        if ($this->status !== 'Disetujui') {
+            throw new \Exception('Hanya dokumen Disetujui yang bisa diarsipkan.');
         }
 
         // Buat arsip baru otomatis

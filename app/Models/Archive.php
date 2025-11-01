@@ -45,7 +45,7 @@ class Archive extends Model
 
             $count = self::whereYear('created_at', now()->year)->count() + 1;
 
-            // 🔹 Format nomor arsip => contoh: PD/2025/0001
+            // Format nomor arsip => contoh: PD/2025/0001
             $model->nomor_arsip = sprintf('%s/%d/%04d', $prefix, now()->year, $count);
         });
     }

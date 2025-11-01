@@ -23,7 +23,8 @@ return new class extends Migration
             $table->date('tanggal_diundangkan')->nullable(); // PERDES -- publish 
             $table->text('keterangan')->nullable(); // 2-2nya
             $table->string('file_upload')->nullable();
-            $table->enum('status', ['Draft', 'Disetujui', 'Ditolak', 'Publish', 'Arsip'])->default('Draft');
+            // $table->enum('status', ['Draft', 'Disetujui', 'Ditolak', 'Publish', 'Arsip'])->default('Draft');
+            $table->enum('status', ['Draft', 'Disetujui', 'Ditolak', 'Arsip'])->default('Draft');
             $table->timestamps();
 
             $table->foreign('id_user')->references('id')->on('users')->onDelete('cascade');

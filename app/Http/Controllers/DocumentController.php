@@ -10,6 +10,7 @@ use Illuminate\Validation\Rule;
 use App\Traits\LogsActivity;
 use Illuminate\Support\Facades\Auth;
 use App\Events\DocumentStatusChanged;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class DocumentController extends Controller
@@ -88,9 +89,6 @@ class DocumentController extends Controller
             'nomor_ditetapkan'     => ['sometimes', 'string', 'max:150'],
             'tanggal_ditetapkan'   => ['sometimes', 'date'],
             'tentang'              => ['sometimes', 'string'],
-            'nomor_ditetapkan'     => ['sometimes', 'string', 'max:150'],
-            'tanggal_ditetapkan'   => ['sometimes', 'date'],
-            'tentang'              => ['sometimes', 'string'],
             'keterangan'           => ['nullable', 'string'],
             'file_upload'          => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
         ]);
@@ -140,30 +138,61 @@ class DocumentController extends Controller
     }
 
     // PUT /api/documents/{document}/approve  (kepdes)
+
     public function approve(Document $document)
     {
         if ($document->status !== 'Draft') {
             return response()->json(['message' => 'Hanya Draft yang bisa disetujui.'], 422);
         }
 
-        // Pastikan field krusial sudah ada (kalau kamu buat required di store, cek ini opsional)
         if (empty($document->nomor_ditetapkan) || empty($document->tanggal_ditetapkan)) {
             return response()->json([
                 'message' => 'Nomor ditetapkan dan tanggal ditetapkan harus diisi sebelum persetujuan.'
             ], 422);
         }
 
-        $document->update([
-            'status' => 'Disetujui',
-        ]);
+        return DB::transaction(function () use ($document) {
+            $tahun = now()->year;
 
-        $document->logActivity('Dokumen disetujui oleh Kepala Desa');
+            // 🔒 Kunci logis per (jenis_dokumen, tahun) — aman untuk Postgres (INT4)
+            // hashtext(?) => INT4; tahun => INT4
+            DB::select('SELECT pg_advisory_xact_lock(hashtext(?), ?)', [
+                $document->jenis_dokumen,
+                (int) $tahun,
+            ]);
 
-        //baru
-        event(new DocumentStatusChanged($document, $document->status, 'Disetujui'));
+            // Hitung nomor berikutnya untuk (jenis_dokumen, tahun) yang sama
+            $max = DB::table('documents')
+                ->where('jenis_dokumen', $document->jenis_dokumen)
+                ->whereYear('tanggal_diundangkan', $tahun)
+                ->max('nomor_diundangkan');
 
-        return response()->json(['message' => 'Dokumen disetujui.']);
+            $nextNumber = (int) ($max ?? 0) + 1;
+
+            // Set nomor & tanggal diundangkan saat approve
+            $document->update([
+                'nomor_diundangkan'   => $nextNumber,
+                'tanggal_diundangkan' => now(),
+                'status'              => 'Disetujui',
+            ]);
+
+            $label = $document->jenis_dokumen === 'peraturan_desa' ? 'Lembaran Desa' : 'Berita Desa';
+            $document->logActivity("Disetujui & diundangkan ke {$label} oleh Kepala Desa");
+
+            return response()->json([
+                'message' => 'Dokumen disetujui & diundangkan.',
+                'data'    => [
+                    'id'                        => $document->id,
+                    'jenis_dokumen'             => $document->jenis_dokumen,
+                    'nomor_diundangkan'         => $document->nomor_diundangkan,
+                    'nomor_diundangkan_display' => $document->nomor_diundangkan_display, // e.g. LD/2025/005
+                    'tanggal_diundangkan'       => $document->tanggal_diundangkan?->toDateString(),
+                    'status'                    => $document->status, // Disetujui
+                ]
+            ]);
+        });
     }
+
 
 
 
@@ -175,8 +204,7 @@ class DocumentController extends Controller
         }
         $request->validate(['catatan' => 'nullable|string']);
         $document->update(['status' => 'Ditolak', 'keterangan' => $request->get('catatan')]);
-        $document->storeActivity('Dokumen ditolak oleh kepala desa');
-
+        $document->logActivity('Dokumen ditolak oleh Kepala Desa');
         //baru
         event(new DocumentStatusChanged($document, $document->status, 'Ditolak'));
 
@@ -186,42 +214,11 @@ class DocumentController extends Controller
     // PUT /api/documents/{document}/publish  (sekdes) — status harus Disetujui
     public function publish(Document $document)
     {
-        if ($document->status !== 'Disetujui') {
-            return response()->json(['message' => 'Hanya dokumen Disetujui yang bisa dipublish.'], 422);
-        }
-
-        // Tentukan nomor_diundangkan (INT) berikutnya per (jenis_dokumen, tahun)
-        $nextNumber = \App\Models\Document::nextNomorDiundangkan($document->jenis_dokumen);
-
-        $document->update([
-            'nomor_diundangkan'   => $nextNumber,      // INT sesuai skema
-            'tanggal_diundangkan' => now(),            // tanggal publish
-            'status'              => 'Publish',        // enum sudah mengizinkan Publish
-        ]);
-
-        // Catat activity yang informatif
-        $label = $document->jenis_dokumen === 'peraturan_desa'
-            ? 'Lembaran Desa'
-            : 'Berita Desa'; // peraturan_kepala_desa / peraturan_bersama_kepala_desa
-
-        $document->logActivity("Diundangkan ke {$label} oleh Sekretaris Desa");
-
-        //baru
-        event(new DocumentStatusChanged($document, 'Disetujui', 'Publish'));
-
-        // (opsional) kirim juga nomor diundangkan display agar FE langsung bisa pakai
         return response()->json([
-            'message' => 'Dokumen berhasil dipublish.',
-            'data'    => [
-                'id'                        => $document->id,
-                'jenis_dokumen'             => $document->jenis_dokumen,
-                'nomor_diundangkan'         => $document->nomor_diundangkan,             // integer murni
-                'nomor_diundangkan_display' => $document->nomor_diundangkan_display,     // e.g. LD/2025/005
-                'tanggal_diundangkan'       => $document->tanggal_diundangkan?->toDateString(),
-                'status'                    => $document->status,
-            ]
-        ]);
+            'message' => 'Endpoint publish dinonaktifkan: dokumen akan otomatis diundangkan saat disetujui.'
+        ], 410); // 410 Gone
     }
+
 
     // GET /api/documents/{document}/download  (sekdes|kepdes)
     public function download(Request $request, Document $document)
@@ -238,7 +235,7 @@ class DocumentController extends Controller
     // GET /api/public/documents/{document}
     public function showPublic(Document $document)
     {
-        if (!in_array($document->status, ['Publish', 'Arsip'])) {
+        if (!in_array($document->status, ['Disetujui', 'Arsip'])) {
             return response()->json(['message' => 'Not found'], 404);
         }
         return new DocumentResource($document);
@@ -247,9 +244,10 @@ class DocumentController extends Controller
     // GET /api/public/documents/{document}/download
     public function downloadPublic(Document $document)
     {
-        if (!in_array($document->status, ['Publish', 'Arsip']) || !$document->file_upload) {
+        if (!in_array($document->status, ['Disetujui', 'Arsip']) || !$document->file_upload) {
             return response()->json(['message' => 'Not found'], 404);
         }
+
         $path = storage_path('app/public/' . $document->file_upload);
         return response()->download($path);
     }
@@ -261,7 +259,7 @@ class DocumentController extends Controller
 
         $data = Document::query()
             ->whereYear('tanggal_diundangkan', $tahun)
-            ->whereIn('status', ['Publish', 'Arsip'])
+            ->whereIn('status', ['Disetujui', 'Arsip'])
             ->orderBy('tanggal_diundangkan')
             ->get();
 
