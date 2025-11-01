@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Auth;
 use App\Events\DocumentStatusChanged;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Barryvdh\DomPDF\Facade\Pdf;
+
 
 class DocumentController extends Controller
 {
@@ -46,8 +48,8 @@ class DocumentController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'jenis_dokumen'        => ['nullable', Rule::in(['peraturan_desa', 'peraturan_kepala_desa', 'peraturan_bersama_kepala_desa'])],
-            'nomor_ditetapkan'     => ['required', 'string', 'max:150'],
+            'jenis_dokumen'        => ['required', Rule::in(['peraturan_desa', 'peraturan_kepala_desa', 'peraturan_bersama_kepala_desa'])],
+            'nomor_ditetapkan'     => ['nullable', 'string', 'max:150'],
             'tanggal_ditetapkan'   => ['required', 'date'],
             'tentang'              => ['required', 'string'],
             'keterangan'           => ['nullable', 'string'],
@@ -59,7 +61,7 @@ class DocumentController extends Controller
         $doc = Document::create([
             'id_user'             => $request->user()?->id ?? Auth::id(),
             'jenis_dokumen'       => $validated['jenis_dokumen'] ?? 'peraturan_desa',
-            'nomor_ditetapkan'    => $validated['nomor_ditetapkan'],
+            'nomor_ditetapkan'    => $validated['nomor_ditetapkan'] ?? null,
             'tanggal_ditetapkan'  => $validated['tanggal_ditetapkan'],
             'tentang'             => $validated['tentang'],
             // 'uraian_singkat'      => $validated['uraian_singkat'] ?? null,
@@ -253,18 +255,107 @@ class DocumentController extends Controller
     }
 
     // GET /api/laporan?tahun=YYYY  (sekdes|kepdes) — JSON rekap
+
     public function laporan(Request $request)
     {
-        $tahun = (int) ($request->get('tahun') ?? now()->year);
+        // by = week|month|year hanya untuk bantu pilih rentang cepat
+        $by = strtolower($request->query('by', 'month'));
+        if (!in_array($by, ['week','month','year'], true)) {
+            return response()->json(['message' => 'Param "by" harus week|month|year'], 422);
+        }
 
-        $data = Document::query()
-            ->whereYear('tanggal_diundangkan', $tahun)
-            ->whereIn('status', ['Disetujui', 'Arsip'])
-            ->orderBy('tanggal_diundangkan')
-            ->get();
+        // rentang default setahun penuh (berdasar "tahun")
+        $year  = (int) ($request->query('tahun', now()->year));
+        $start = $request->query('start')
+            ? \Carbon\Carbon::parse($request->query('start'))->toDateString()
+            : \Carbon\Carbon::create($year, 1, 1)->toDateString();
 
-        return DocumentResource::collection($data)->additional([
-            'meta' => ['tahun' => $tahun, 'count' => $data->count()]
+        $end   = $request->query('end')
+            ? \Carbon\Carbon::parse($request->query('end'))->toDateString()
+            : \Carbon\Carbon::create($year, 12, 31)->toDateString();
+
+        if ($start > $end) {
+            [$start, $end] = [$end, $start];
+        }
+
+        // filter status (default hanya yang sudah terbit & pasca-terbit)
+        $statuses = $request->query('status', ['Disetujui','Arsip']);
+        if (!is_array($statuses)) $statuses = [$statuses];
+
+        // >>> BASIS DIUBAH: tanggal_diundangkan <<<
+        $items = Document::query()
+            ->whereNotNull('tanggal_diundangkan')
+            ->whereBetween(DB::raw('tanggal_diundangkan'), [$start, $end])
+            ->when($statuses, fn($q) => $q->whereIn('status', $statuses))
+            ->orderBy('tanggal_diundangkan')          // urutkan menurut tanggal diundangkan
+            ->orderBy('jenis_dokumen')
+            ->orderBy('nomor_diundangkan')            // nomor diundangkan dalam tahun tsb
+            ->get([
+                'id',
+                'nomor_urut',
+                'jenis_dokumen',
+                'nomor_ditetapkan',
+                'tanggal_ditetapkan',
+                'tentang',
+                'tanggal_diundangkan',
+                'nomor_diundangkan',
+                'keterangan',
+                'status',
+            ]);
+
+        if ($request->query('format') === 'pdf') {
+            $rows = $items->map(function ($d) {
+                $jenisLabel = match ($d->jenis_dokumen) {
+                    'peraturan_desa'                 => 'Peraturan Desa',
+                    'peraturan_kepala_desa'          => 'Peraturan Kepala Desa',
+                    'peraturan_bersama_kepala_desa'  => 'Peraturan Bersama Kepala Desa',
+                    default => ucfirst(str_replace('_',' ', (string)$d->jenis_dokumen)),
+                };
+
+                $noUndangDisp = $d->nomor_diundangkan && $d->tanggal_diundangkan
+                    ? sprintf('%s/%d/%03d',
+                        $d->jenis_dokumen === 'peraturan_desa' ? 'LD' : 'BD',
+                        (int) \Carbon\Carbon::parse($d->tanggal_diundangkan)->format('Y'),
+                        (int) $d->nomor_diundangkan
+                    )
+                    : null;
+
+                return [
+                    'nomor_urut'            => $d->nomor_urut,
+                    'jenis_label'           => $jenisLabel,
+                    'nomor_ditetapkan'      => $d->nomor_ditetapkan,
+                    'tanggal_ditetapkan'    => $d->tanggal_ditetapkan ? \Carbon\Carbon::parse($d->tanggal_ditetapkan)->format('d-m-Y') : '',
+                    'tentang'               => $d->tentang,
+                    'tanggal_diundangkan'   => $d->tanggal_diundangkan ? \Carbon\Carbon::parse($d->tanggal_diundangkan)->format('d-m-Y') : '',
+                    'nomor_diundangkan'     => $d->nomor_diundangkan,
+                    'nomor_diundangkan_disp'=> $noUndangDisp,
+                    'keterangan'            => $d->keterangan ?? '-',
+                ];
+            });
+
+            // pakai facade Pdf (pastikan importnya benar)
+            $pdf = Pdf::loadView('reports.lembaran', [
+                'rows'  => $rows,
+                'start' => $start,
+                'end'   => $end,
+                'judul' => 'Buku Lembaran dan Berita Desa',
+            ])->setPaper('A4', 'portrait');
+
+            return $pdf->download("buku-lembaran-{$start}-{$end}.pdf");
+        }
+
+        // JSON preview (kalau butuh)
+        return response()->json([
+            'meta'  => [
+                'basis'     => 'tanggal_diundangkan',
+                'by'        => $by,
+                'start'     => $start,
+                'end'       => $end,
+                'statuses'  => $statuses,
+                'count'     => $items->count(),
+            ],
+            'items' => $items,
         ]);
     }
+
 }
