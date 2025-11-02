@@ -64,7 +64,6 @@ class DocumentController extends Controller
             'nomor_ditetapkan'    => $validated['nomor_ditetapkan'] ?? null,
             'tanggal_ditetapkan'  => $validated['tanggal_ditetapkan'],
             'tentang'             => $validated['tentang'],
-            // 'uraian_singkat'      => $validated['uraian_singkat'] ?? null,
             'keterangan'          => $validated['keterangan'] ?? null,
             'file_upload'         => $path,
             'status'              => 'Draft',
@@ -140,7 +139,6 @@ class DocumentController extends Controller
     }
 
     // PUT /api/documents/{document}/approve  (kepdes)
-
     public function approve(Document $document)
     {
         if ($document->status !== 'Draft') {
