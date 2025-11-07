@@ -18,6 +18,16 @@ class ArsipController extends Controller
     public function index(Request $request)
     {
         $list = Archive::with('document')
+            ->when($request->get('search'), function($q, $v) {
+                $q->where(function($query) use ($v) {
+                    $query->where('keterangan', 'LIKE', "%{$v}%")
+                          ->orWhereHas('document', function($docQuery) use ($v) {
+                              $docQuery->where('tentang', 'LIKE', "%{$v}%")
+                                       ->orWhere('nomor_ditetapkan', 'LIKE', "%{$v}%")
+                                       ->orWhere('jenis_dokumen', 'LIKE', "%{$v}%");
+                          });
+                });
+            })
             ->latest('tanggal_arsip')
             ->paginate($request->integer('per_page', 15));
 

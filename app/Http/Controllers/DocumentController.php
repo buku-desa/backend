@@ -25,6 +25,13 @@ class DocumentController extends Controller
         $docs = Document::query()
             ->when($request->get('status'), fn($q, $v) => $q->where('status', $v))
             ->when($request->get('jenis_dokumen'),   fn($q, $v) => $q->where('jenis_dokumen', $v))
+            ->when($request->get('search'), function($q, $v) {
+                $q->where(function($query) use ($v) {
+                    $query->where('tentang', 'LIKE', "%{$v}%")
+                          ->orWhere('nomor_ditetapkan', 'LIKE', "%{$v}%")
+                          ->orWhere('keterangan', 'LIKE', "%{$v}%");
+                });
+            })
             ->latest()
             ->paginate($request->integer('per_page', 15));
 

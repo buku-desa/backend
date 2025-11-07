@@ -31,6 +31,17 @@ class ActivityLogController extends Controller
             $query->whereDate('waktu_aktivitas', '<=', $request->date_to);
         }
 
+        if($request->has('search')){
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('aktivitas', 'LIKE', "%{$search}%")
+                  ->orWhereHas('user', function($userQuery) use ($search) {
+                      $userQuery->where('name', 'LIKE', "%{$search}%")
+                                ->orWhere('username', 'LIKE', "%{$search}%");
+                  });
+            });
+        }
+
         $logs = $query->latest()->paginate(10);
 
         return response()->json([
