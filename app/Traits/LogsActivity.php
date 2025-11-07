@@ -32,6 +32,8 @@ trait LogsActivity
                 'id_user' => Auth::id(),
                 'id_dokumen' => $this->id ?? null,
                 'aktivitas' => class_basename($this) . " {$activity}",
+                'modul' => class_basename($this), // contoh: "Document" atau "User"
+                'keterangan' => "Data " . strtolower(class_basename($this)) . " telah {$activity}.",
                 'waktu_aktivitas' => now(),
             ]);
         } catch (\Exception $e) {
