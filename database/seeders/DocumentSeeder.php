@@ -44,8 +44,8 @@ class DocumentSeeder extends Seeder
             return Document::create($defaults);
         };
 
-        // ========== DATA BERDASARKAN TANGGAL DIUNDANGKAN ========== // 
-        // 2021 
+        // ========== DATA BERDASARKAN TANGGAL DIUNDANGKAN ========== //
+        // 2021
         $make([
             'jenis_dokumen' => 'peraturan_desa',
             'tentang' => 'Perdes APBDes 2021',
@@ -68,10 +68,12 @@ class DocumentSeeder extends Seeder
             'jenis_dokumen' => 'peraturan_kepala_desa',
             'tentang' => 'Edaran Internal 2021',
             'status' => 'Draft',
+            'nomor_ditetapkan' => 'KEP/10/2021',
+            'tanggal_ditetapkan' => '2021-11-15',
             'tanggal_diundangkan' => '2021-11-15',
         ]);
 
-        // 2022 
+        // 2022
         $make([
             'jenis_dokumen' => 'peraturan_kepala_desa',
             'tentang' => 'Keputusan Pengangkatan Perangkat',
@@ -99,7 +101,7 @@ class DocumentSeeder extends Seeder
             'nomor_ditetapkan' => '003/2022',
         ]);
 
-        // 2023 
+        // 2023
         $make([
             'jenis_dokumen' => 'peraturan_desa',
             'tentang' => 'Perdes Pajak Desa 2023',
@@ -126,7 +128,7 @@ class DocumentSeeder extends Seeder
             'nomor_ditetapkan' => 'PB/09/2023',
             'tanggal_ditetapkan' => '2023-12-01',
         ]);
-        // 2024 
+        // 2024
         $make([
             'jenis_dokumen' => 'peraturan_desa',
             'tentang' => 'Perdes BUMDes 2024',
@@ -151,7 +153,7 @@ class DocumentSeeder extends Seeder
             'tanggal_diundangkan' => '2024-12-31',
             'nomor_ditetapkan' => 'KEP/12/2024',
         ]);
-        // 2025 
+        // 2025
         $make([
             'jenis_dokumen' => 'peraturan_desa',
             'tentang' => 'Perdes APBDes 2025',

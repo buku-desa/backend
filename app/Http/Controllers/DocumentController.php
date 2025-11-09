@@ -25,11 +25,11 @@ class DocumentController extends Controller
         $docs = Document::query()
             ->when($request->get('status'), fn($q, $v) => $q->where('status', $v))
             ->when($request->get('jenis_dokumen'),   fn($q, $v) => $q->where('jenis_dokumen', $v))
-            ->when($request->get('search'), function($q, $v) {
-                $q->where(function($query) use ($v) {
+            ->when($request->get('search'), function ($q, $v) {
+                $q->where(function ($query) use ($v) {
                     $query->where('tentang', 'LIKE', "%{$v}%")
-                          ->orWhere('nomor_ditetapkan', 'LIKE', "%{$v}%")
-                          ->orWhere('keterangan', 'LIKE', "%{$v}%");
+                        ->orWhere('nomor_ditetapkan', 'LIKE', "%{$v}%")
+                        ->orWhere('keterangan', 'LIKE', "%{$v}%");
                 });
             })
             ->latest()
@@ -265,7 +265,7 @@ class DocumentController extends Controller
     {
         // by = week|month|year hanya untuk bantu pilih rentang cepat
         $by = strtolower($request->query('by', 'month'));
-        if (!in_array($by, ['week','month','year'], true)) {
+        if (!in_array($by, ['week', 'month', 'year'], true)) {
             return response()->json(['message' => 'Param "by" harus week|month|year'], 422);
         }
 
@@ -284,17 +284,22 @@ class DocumentController extends Controller
         }
 
         // filter status (default hanya yang sudah terbit & pasca-terbit)
-        $statuses = $request->query('status', ['Disetujui','Arsip']);
+        $statuses = $request->query('status', ['Disetujui', 'Arsip']);
         if (!is_array($statuses)) $statuses = [$statuses];
 
-        // >>> BASIS DIUBAH: tanggal_diundangkan <<<
+        // filter jenis_dokumen (tambahkan ini)
+        $jenisDokumen = $request->query('jenis_dokumen', ['peraturan_desa', 'peraturan_kepala_desa', 'peraturan_bersama_kepala_desa']);
+        if (!is_array($jenisDokumen)) $jenisDokumen = [$jenisDokumen];
+
+        // Query dengan filter jenis_dokumen
         $items = Document::query()
             ->whereNotNull('tanggal_diundangkan')
-            ->whereBetween(DB::raw('tanggal_diundangkan'), [$start, $end])
+            ->whereBetween(('tanggal_diundangkan'), [$start, $end])
             ->when($statuses, fn($q) => $q->whereIn('status', $statuses))
-            ->orderBy('tanggal_diundangkan')          // urutkan menurut tanggal diundangkan
+            ->when($jenisDokumen, fn($q) => $q->whereIn('jenis_dokumen', $jenisDokumen)) // ⬅️ TAMBAH INI
+            ->orderBy('tanggal_diundangkan')
             ->orderBy('jenis_dokumen')
-            ->orderBy('nomor_diundangkan')            // nomor diundangkan dalam tahun tsb
+            ->orderBy('nomor_diundangkan')
             ->get([
                 'id',
                 'nomor_urut',
@@ -314,11 +319,12 @@ class DocumentController extends Controller
                     'peraturan_desa'                 => 'Peraturan Desa',
                     'peraturan_kepala_desa'          => 'Peraturan Kepala Desa',
                     'peraturan_bersama_kepala_desa'  => 'Peraturan Bersama Kepala Desa',
-                    default => ucfirst(str_replace('_',' ', (string)$d->jenis_dokumen)),
+                    default => ucfirst(str_replace('_', ' ', (string)$d->jenis_dokumen)),
                 };
 
                 $noUndangDisp = $d->nomor_diundangkan && $d->tanggal_diundangkan
-                    ? sprintf('%s/%d/%03d',
+                    ? sprintf(
+                        '%s/%d/%03d',
                         $d->jenis_dokumen === 'peraturan_desa' ? 'LD' : 'BD',
                         (int) \Carbon\Carbon::parse($d->tanggal_diundangkan)->format('Y'),
                         (int) $d->nomor_diundangkan
@@ -333,7 +339,7 @@ class DocumentController extends Controller
                     'tentang'               => $d->tentang,
                     'tanggal_diundangkan'   => $d->tanggal_diundangkan ? \Carbon\Carbon::parse($d->tanggal_diundangkan)->format('d-m-Y') : '',
                     'nomor_diundangkan'     => $d->nomor_diundangkan,
-                    'nomor_diundangkan_disp'=> $noUndangDisp,
+                    'nomor_diundangkan_disp' => $noUndangDisp,
                     'keterangan'            => $d->keterangan ?? '-',
                 ];
             });
@@ -362,5 +368,4 @@ class DocumentController extends Controller
             'items' => $items,
         ]);
     }
-
 }
