@@ -20,23 +20,64 @@ class DocumentController extends Controller
     use LogsActivity;
 
     // GET /api/documents  (sekdes|kepdes)
+    // add filter berdasarkan status, jenis_dokumen, search, tahun/tanggal start-end dan multi jenis, dan search buat jenis_dokumen
     public function index(Request $request)
     {
         $docs = Document::query()
-            ->when($request->get('status'), fn($q, $v) => $q->where('status', $v))
-            ->when($request->get('jenis_dokumen'),   fn($q, $v) => $q->where('jenis_dokumen', $v))
+            // 🔹 Filter status (bisa string atau array)
+            ->when($request->filled('status'), function ($q) use ($request) {
+                $statuses = (array) $request->get('status');
+                $q->whereIn('status', $statuses);
+            })
+
+            // 🔹 Filter jenis_dokumen (bisa string atau array)
+            ->when($request->filled('jenis_dokumen'), function ($q) use ($request) {
+                $types = (array) $request->get('jenis_dokumen');
+                $q->whereIn('jenis_dokumen', $types);
+            })
+
+            // 🔹 Filter pencarian umum (tentang, nomor, keterangan)
+            // add for jenis_dokumen
             ->when($request->get('search'), function ($q, $v) {
                 $q->where(function ($query) use ($v) {
                     $query->where('tentang', 'LIKE', "%{$v}%")
                         ->orWhere('nomor_ditetapkan', 'LIKE', "%{$v}%")
-                        ->orWhere('keterangan', 'LIKE', "%{$v}%");
+                        ->orWhere('nomor_diundangkan', 'LIKE', "%{$v}%")
+                        ->orWhere('keterangan', 'LIKE', "%{$v}%")
+                        ->orWhere('jenis_dokumen', 'LIKE', "%{$v}%");
                 });
             })
+
+            // 🔹 Filter tahun (berdasarkan tanggal_ditetapkan)
+            ->when($request->filled('tahun'), function ($q) use ($request) {
+                $q->whereYear('tanggal_ditetapkan', (int) $request->get('tahun'));
+            })
+
+            // 🔹 Filter rentang tanggal (start_date - end_date)
+            ->when($request->filled('start_date') && $request->filled('end_date'), function ($q) use ($request) {
+                $start = $request->get('start_date');
+                $end   = $request->get('end_date');
+                $q->whereBetween('tanggal_ditetapkan', [$start, $end]);
+            })
+
             ->latest()
             ->paginate($request->integer('per_page', 15));
 
         return DocumentResource::collection($docs)
-            ->additional(['meta' => ['page' => $docs->currentPage(), 'total' => $docs->total()]]);
+            ->additional([
+                'meta' => [
+                    'page' => $docs->currentPage(),
+                    'total' => $docs->total(),
+                    'filters' => [
+                        'status'        => $request->get('status'),
+                        'jenis_dokumen' => $request->get('jenis_dokumen'),
+                        'tahun'         => $request->get('tahun'),
+                        'start_date'    => $request->get('start_date'),
+                        'end_date'      => $request->get('end_date'),
+                        'search'        => $request->get('search'),
+                    ]
+                ]
+            ]);
     }
 
     // GET /api/documents/{document}  (sekdes|kepdes)
@@ -260,7 +301,6 @@ class DocumentController extends Controller
     }
 
     // GET /api/laporan?tahun=YYYY  (sekdes|kepdes) — JSON rekap
-
     public function laporan(Request $request)
     {
         // by = week|month|year hanya untuk bantu pilih rentang cepat
