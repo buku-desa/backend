@@ -119,7 +119,7 @@ class DocumentController extends Controller
 
         $doc->logActivity('dibuat oleh ' . ($request->user()?->name ?? 'Sistem'));
 
-        //baru
+        // email notifikasi
         event(new DocumentStatusChanged($doc, null, 'Draft'));
 
         return (new DocumentResource($doc))->response()->setStatusCode(201);
@@ -161,7 +161,7 @@ class DocumentController extends Controller
 
         $document->logActivity('diperbarui oleh ' . ($request->user()?->name ?? 'Sistem'));
 
-        //baru
+        // email notifikasi
         if ($oldStatus === 'Ditolak' && $document->status === 'Draft') {
             event(new DocumentStatusChanged($document, 'Ditolak', 'Draft'));
         }
@@ -227,6 +227,9 @@ class DocumentController extends Controller
             $label = $document->jenis_dokumen === 'peraturan_desa' ? 'Lembaran Desa' : 'Berita Desa';
             $document->logActivity("Disetujui & diundangkan ke {$label} oleh Kepala Desa");
 
+            // email notifikasi
+            event(new DocumentStatusChanged($document, 'Draft', 'Disetujui'));
+
             return response()->json([
                 'message' => 'Dokumen disetujui & diundangkan.',
                 'data'    => [
@@ -251,10 +254,17 @@ class DocumentController extends Controller
             return response()->json(['message' => 'Dokumen arsip tidak bisa ditolak.'], 422);
         }
         $request->validate(['catatan' => 'nullable|string']);
-        $document->update(['status' => 'Ditolak', 'keterangan' => $request->get('catatan')]);
+        // new
+        $oldStatus = $document->status;
+
+        $document->update([
+            'status' => 'Ditolak',
+            'keterangan' => $request->get('catatan')
+        ]);
+
         $document->logActivity('Dokumen ditolak oleh Kepala Desa');
         //baru
-        event(new DocumentStatusChanged($document, $document->status, 'Ditolak'));
+        event(new DocumentStatusChanged($document, $oldStatus, 'Ditolak'));
 
         return response()->json(['message' => 'Dokumen ditolak.']);
     }
