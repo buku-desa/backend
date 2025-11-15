@@ -4,8 +4,8 @@ setlocal enableextensions enabledelayedexpansion
 REM ====== CONFIG (sesuaikan) ======
 set "DB_HOST=127.0.0.1"
 set "DB_PORT=5432"
-set "DB_NAME="
-set "DB_USER="
+set "DB_NAME=lembarandanberitadesa"
+set "DB_USER=postgres"
 set "DB_PASSWORD="
 
 REM Folder backup lokal, SAMAIN PUNYA KALIAN
