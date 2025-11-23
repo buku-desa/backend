@@ -97,7 +97,12 @@ class DocumentController extends Controller
     {
         $validated = $request->validate([
             'jenis_dokumen'        => ['required', Rule::in(['peraturan_desa', 'peraturan_kepala_desa', 'peraturan_bersama_kepala_desa'])],
-            'nomor_ditetapkan'     => ['nullable', 'numeric', 'min:0'],
+            'nomor_ditetapkan' => [
+                'required',
+                'string',
+                'max:50',
+                'regex:/^[A-Z0-9\/.-]+$/'
+            ],
             'tanggal_ditetapkan'   => ['required', 'date', 'before_or_equal:today'],
             'tentang'              => ['required', 'string'],
             'keterangan'           => ['nullable', 'string'],
@@ -136,7 +141,12 @@ class DocumentController extends Controller
         $validated = $request->validate([
             'jenis_dokumen'        => ['nullable', Rule::in(['peraturan_desa', 'peraturan_kepala_desa', 'peraturan_bersama_kepala_desa'])],
             // 'nomor_ditetapkan'     => ['sometimes', 'string', 'max:150'],
-            'nomor_ditetapkan'     => ['nullable', 'numeric', 'min:0'],
+            'nomor_ditetapkan'     => [
+                'nullable',
+                'string',
+                'max:50',
+                'regex:/^[A-Z0-9\/.-]+$/'
+            ],
             // 'tanggal_ditetapkan'   => ['sometimes', 'date'],
             'tanggal_ditetapkan'   => ['required', 'date', 'before_or_equal:today'],
             'tentang'              => ['sometimes', 'string'],

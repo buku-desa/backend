@@ -14,10 +14,14 @@ class DocumentSeeder extends Seeder
     public function run(): void
     {
         // === Ambil user dari UserSeeder ===
-        $sekdes = User::where('email', 'sekdes1@example.com')->first();
+        $sekdesList = User::whereIn('email', [
+            'sekdes1@example.com',
+            'sekdes2@example.com',
+            'sekdes3@example.com',
+        ])->get();
         $kepdes = User::where('email', 'kepdes1@example.com')->first();
 
-        $author = $sekdes ?? $kepdes ?? User::first();
+        $author = $sekdesList ?? $kepdes ?? User::first();
 
         if (!$author) {
             $this->command?->warn('⚠️ Tidak ada user di DB. Jalankan UserSeeder terlebih dahulu.');
